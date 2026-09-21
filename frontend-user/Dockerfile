@@ -19,6 +19,7 @@ RUN echo 'server { \
     } \
     gzip on; \
     gzip_types text/plain text/css application/json application/javascript text/xml; \
+    add_header Cache-Control "no-store" always; \
 }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
