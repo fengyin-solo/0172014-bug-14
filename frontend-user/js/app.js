@@ -11,12 +11,24 @@ class App {
         if (this.initialized) return;
         this.initialized = true;
 
-        // 初始化组件
-        window.componentRenderer.init();
+        // 初始化组件（单模块失败不影响其余模块）
+        try {
+            window.componentRenderer.init();
+        } catch (err) {
+            console.error('组件渲染失败', err);
+        }
 
         // 初始化图表
-        window.chartManager.initFunnelChart('funnelChart');
-        window.chartManager.initRadarChart('radarChart');
+        try {
+            window.chartManager.initFunnelChart('funnelChart');
+        } catch (err) {
+            console.error('漏斗图初始化失败', err);
+        }
+        try {
+            window.chartManager.initRadarChart('radarChart');
+        } catch (err) {
+            console.error('雷达图初始化失败', err);
+        }
 
         // 监听窗口大小变化
         window.addEventListener('resize', this.handleResize.bind(this));
@@ -49,14 +61,20 @@ class App {
     // 刷新数据
     refresh() {
         window.toast.info('刷新中', '正在重新加载数据...');
-        
+
         setTimeout(() => {
-            window.componentRenderer.renderStats();
-            window.componentRenderer.renderMatrix();
-            window.componentRenderer.renderQuickWins();
-            window.chartManager.resize();
-            
-            window.toast.success('刷新完成', '数据已更新');
+            try {
+                window.componentRenderer.renderStats();
+                window.componentRenderer.renderMatrix();
+                window.componentRenderer.renderQuickWins();
+                window.componentRenderer.renderFooter();
+                window.chartManager.resize();
+
+                window.toast.success('刷新完成', '数据已更新');
+            } catch (err) {
+                console.error('刷新失败', err);
+                window.toast.error('刷新失败', '部分模块异常，已保留当前展示');
+            }
         }, 1000);
     }
 

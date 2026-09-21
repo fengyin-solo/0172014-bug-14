@@ -354,6 +354,37 @@
     box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
 }
 
+/* 缺失数据兜底单元格：明确标注按阶段1档（起步）处理 */
+.cell-fallback {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.02)) !important;
+    border: 1px dashed rgba(245, 158, 11, 0.4) !important;
+    border-radius: var(--radius-md);
+}
+
+.tag-fallback {
+    background: linear-gradient(135deg, var(--warning), #d97706);
+    color: #1a1a2e;
+    box-shadow: 0 2px 10px rgba(245, 158, 11, 0.35);
+}
+
+.matrix-empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted);
+}
+
+/* 图表不可用时的可读占位 */
+.chart-fallback {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    border: 1px dashed rgba(168, 85, 247, 0.3);
+    border-radius: var(--radius-md);
+}
+
 /* SOP列表 */
 .sop-list {
     margin: 12px 0;
@@ -435,6 +466,21 @@
 .tool-tag.domestic:hover {
     background: rgba(236, 72, 153, 0.3);
     box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+}
+
+/* 工具缺失时的占位标签 */
+.tool-tag.placeholder {
+    border-style: dashed;
+    opacity: 0.6;
+    cursor: default;
+    font-style: italic;
+}
+
+.tool-tag.placeholder:hover {
+    background: rgba(168, 85, 247, 0.15);
+    color: var(--text-secondary);
+    transform: none;
+    box-shadow: none;
 }
 
 /* ========== 速赢行动清单 ========== */

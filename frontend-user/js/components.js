@@ -28,7 +28,13 @@ class ComponentRenderer {
         const container = document.getElementById('statsGrid');
         if (!container) return;
 
-        container.innerHTML = statsData.map((stat, index) => `
+        const list = (typeof statsData !== 'undefined' && Array.isArray(statsData)) ? statsData : [];
+        if (!list.length) {
+            container.innerHTML = '<div class="glass-card stat-card"><div class="stat-label">⚠️ 统计数据缺失</div></div>';
+            return;
+        }
+
+        container.innerHTML = list.map((stat, index) => `
             <div class="glass-card stat-card fade-in delay-${index + 1}" data-index="${index}">
                 <span class="stat-icon">${stat.icon}</span>
                 <div class="stat-value">${stat.value}</div>
@@ -41,8 +47,10 @@ class ComponentRenderer {
         container.querySelectorAll('.stat-card').forEach(card => {
             card.addEventListener('click', () => {
                 const index = card.dataset.index;
-                const stat = statsData[index];
-                window.toast.info(stat.label, `当前值: ${stat.value}`);
+                const stat = list[index];
+                if (stat) {
+                    window.toast.info(stat.label, `当前值: ${stat.value}`);
+                }
             });
         });
     }
@@ -52,79 +60,116 @@ class ComponentRenderer {
         const table = document.getElementById('matrixTable');
         if (!table) return;
 
-        let html = '<thead><tr><th>运营维度</th>';
-        
-        matrixData.phases.forEach(p => {
-            html += `
-                <th>
-                    <div style="font-weight: 700;">${p.name}</div>
-                    <div style="font-size: 12px; color: var(--neon-cyan); margin-top: 6px; opacity: 0.9;">
-                        焦点: ${p.subtitle}
-                    </div>
-                </th>
-            `;
-        });
-        html += '</tr></thead><tbody>';
+        try {
+            const dims = (typeof matrixData !== 'undefined' && Array.isArray(matrixData.dimensions)) ? matrixData.dimensions : [];
+            const phases = (typeof matrixData !== 'undefined' && Array.isArray(matrixData.phases)) ? matrixData.phases : [];
+            const cells = (typeof matrixData !== 'undefined' && matrixData.cells && typeof matrixData.cells === 'object') ? matrixData.cells : {};
 
-        matrixData.dimensions.forEach((dim, dimIndex) => {
-            html += `<tr class="fade-in delay-${Math.min(dimIndex + 1, 5)}">`;
-            html += `
-                <td class="dimension-cell">
-                    <span class="dimension-icon">${dim.icon}</span>
-                    ${dim.name}
-                </td>
-            `;
+            if (!dims.length || !phases.length) {
+                table.innerHTML = '<tbody><tr><td class="matrix-empty">⚠️ 矩阵数据缺失，请检查数据源后刷新</td></tr></tbody>';
+                return;
+            }
 
-            matrixData.phases.forEach(phase => {
-                const cell = matrixData.cells[dim.key][phase.key];
-                let cellClass = '';
-                let tag = '';
+            let html = '<thead><tr><th>运营维度</th>';
 
-                if (cell.current) {
-                    cellClass = 'cell-current';
-                    tag = '<span class="status-tag tag-current">📍 当前位置</span>';
-                }
-                if (cell.target) {
-                    cellClass = 'cell-target';
-                    tag = '<span class="status-tag tag-target">🎯 改进目标</span>';
-                }
+            phases.forEach(p => {
+                html += `
+                    <th>
+                        <div style="font-weight: 700;">${p.name}</div>
+                        <div style="font-size: 12px; color: var(--neon-cyan); margin-top: 6px; opacity: 0.9;">
+                            焦点: ${p.subtitle}
+                        </div>
+                    </th>
+                `;
+            });
+            html += '</tr></thead><tbody>';
 
-                html += `<td class="${cellClass}"><div class="cell-content">${tag}<div class="sop-list">`;
-                cell.sop.forEach(s => {
-                    html += `<div class="sop-item">${s}</div>`;
+            dims.forEach((dim, dimIndex) => {
+                html += `<tr class="fade-in delay-${Math.min(dimIndex + 1, 5)}">`;
+                html += `
+                    <td class="dimension-cell">
+                        <span class="dimension-icon">${dim.icon}</span>
+                        ${dim.name}
+                    </td>
+                `;
+
+                phases.forEach(phase => {
+                    const row = cells[dim.key] && typeof cells[dim.key] === 'object' ? cells[dim.key] : {};
+                    html += this.buildMatrixCell(row[phase.key]);
                 });
-                html += '</div>';
-
-                if (cell.tools && (cell.tools.international.length || cell.tools.domestic.length)) {
-                    html += '<div class="tools-section"><div class="tools-label">🔧 推荐工具</div>';
-                    cell.tools.international.forEach(t => {
-                        html += `<span class="tool-tag international" data-tool="${t}">${t}</span>`;
-                    });
-                    cell.tools.domestic.forEach(t => {
-                        html += `<span class="tool-tag domestic" data-tool="${t}">${t}</span>`;
-                    });
-                    html += '</div>';
-                }
-                html += '</div></td>';
+                html += '</tr>';
             });
-            html += '</tr>';
-        });
 
-        html += '</tbody>';
-        table.innerHTML = html;
+            html += '</tbody>';
+            table.innerHTML = html;
 
-        // 添加工具标签点击事件
-        table.querySelectorAll('.tool-tag').forEach(tag => {
-            tag.addEventListener('click', () => {
-                const toolName = tag.dataset.tool;
-                const isInternational = tag.classList.contains('international');
-                window.toast.info(
-                    '工具推荐',
-                    `${toolName} - ${isInternational ? '国际工具' : '国内工具'}`,
-                    3000
-                );
+            // 添加工具标签点击事件
+            table.querySelectorAll('.tool-tag:not(.placeholder)').forEach(tag => {
+                tag.addEventListener('click', () => {
+                    const toolName = tag.dataset.tool;
+                    const isInternational = tag.classList.contains('international');
+                    window.toast.info(
+                        '工具推荐',
+                        `${toolName} - ${isInternational ? '国际工具' : '国内工具'}`,
+                        3000
+                    );
+                });
             });
+        } catch (err) {
+            console.error('矩阵渲染失败', err);
+            table.innerHTML = '<tbody><tr><td class="matrix-empty">⚠️ 矩阵渲染异常，其余模块不受影响，请刷新重试</td></tr></tbody>';
+        }
+    }
+
+    // 构建单个矩阵单元格（缺失数据给出兜底，绝不渲染成空白）
+    buildMatrixCell(cell) {
+        if (!cell || typeof cell !== 'object') {
+            return `<td class="cell-fallback"><div class="cell-content">
+                <span class="status-tag tag-fallback">⚠️ 数据缺失 · 暂按阶段1档（起步）处理</span>
+                <div class="sop-list"><div class="sop-item">数据待补充</div></div>
+                <div class="tools-section"><div class="tools-label">🔧 推荐工具</div><span class="tool-tag placeholder">待补充</span></div>
+            </div></td>`;
+        }
+
+        let cellClass = '';
+        let tag = '';
+
+        if (cell.fallback) {
+            cellClass = 'cell-fallback';
+            tag = `<span class="status-tag tag-fallback">⚠️ 数据缺失 · 暂按${cell.assumedTier || '阶段1档（起步）'}处理</span>`;
+        } else if (cell.current) {
+            cellClass = 'cell-current';
+            tag = '<span class="status-tag tag-current">📍 当前位置</span>';
+        } else if (cell.target) {
+            cellClass = 'cell-target';
+            tag = '<span class="status-tag tag-target">🎯 改进目标</span>';
+        }
+
+        const sopList = (Array.isArray(cell.sop) && cell.sop.length) ? cell.sop : ['数据待补充'];
+        const tools = (cell.tools && typeof cell.tools === 'object') ? cell.tools : {};
+        const intlTools = Array.isArray(tools.international) ? tools.international : [];
+        const domesticTools = Array.isArray(tools.domestic) ? tools.domestic : [];
+
+        let html = `<td class="${cellClass}"><div class="cell-content">${tag}<div class="sop-list">`;
+        sopList.forEach(s => {
+            html += `<div class="sop-item">${s}</div>`;
         });
+        html += '</div>';
+
+        // 工具区始终渲染：无数据时显示占位标签，不再整块丢失
+        html += '<div class="tools-section"><div class="tools-label">🔧 推荐工具</div>';
+        if (intlTools.length || domesticTools.length) {
+            intlTools.forEach(t => {
+                html += `<span class="tool-tag international" data-tool="${t}">${t}</span>`;
+            });
+            domesticTools.forEach(t => {
+                html += `<span class="tool-tag domestic" data-tool="${t}">${t}</span>`;
+            });
+        } else {
+            html += '<span class="tool-tag placeholder">待补充</span>';
+        }
+        html += '</div></div></td>';
+        return html;
     }
 
     // 渲染速赢行动清单
@@ -132,7 +177,13 @@ class ComponentRenderer {
         const grid = document.getElementById('quickwinsGrid');
         if (!grid) return;
 
-        grid.innerHTML = quickWins.map((qw, i) => `
+        const list = (typeof quickWins !== 'undefined' && Array.isArray(quickWins)) ? quickWins : [];
+        if (!list.length) {
+            grid.innerHTML = '<div class="glass-card quickwin-card"><div class="quickwin-desc">⚠️ 行动清单数据缺失</div></div>';
+            return;
+        }
+
+        grid.innerHTML = list.map((qw, i) => `
             <div class="glass-card quickwin-card fade-in delay-${i + 1}" data-index="${i}">
                 <div class="quickwin-number">${i + 1}</div>
                 <div class="quickwin-header">
@@ -144,7 +195,7 @@ class ComponentRenderer {
                 </div>
                 <div class="quickwin-desc">${qw.desc}</div>
                 <div class="quickwin-kpi">
-                    ${qw.kpis.map(k => `
+                    ${(Array.isArray(qw.kpis) ? qw.kpis : []).map(k => `
                         <div class="kpi-item">
                             <div class="kpi-value">${k.value}</div>
                             <div class="kpi-label">${k.label}</div>
@@ -158,14 +209,27 @@ class ComponentRenderer {
         grid.querySelectorAll('.quickwin-card').forEach(card => {
             card.addEventListener('click', () => {
                 const index = card.dataset.index;
-                const qw = quickWins[index];
-                window.toast.success(
-                    qw.title,
-                    `执行周期: ${qw.timeline}`,
-                    4000
-                );
+                const qw = list[index];
+                if (qw) {
+                    window.toast.success(
+                        qw.title,
+                        `执行周期: ${qw.timeline}`,
+                        4000
+                    );
+                }
             });
         });
+    }
+
+    // 渲染页脚数据源版本信息（缺失时显示兜底文案）
+    renderFooter() {
+        const el = document.getElementById('dataUpdatedAt');
+        if (!el) return;
+
+        const meta = window.dataSanitizer
+            ? window.dataSanitizer.getMeta()
+            : { version: '未知版本', updatedAt: '日期待同步' };
+        el.textContent = `数据更新时间: ${meta.updatedAt} · 数据源版本: ${meta.version}`;
     }
 
     // 创建粒子效果
@@ -235,7 +299,18 @@ class ComponentRenderer {
     }
 
     renderSidebarContent(container) {
-        const d = diagnosticSummary;
+        const d = (typeof diagnosticSummary !== 'undefined' && diagnosticSummary && typeof diagnosticSummary === 'object')
+            ? diagnosticSummary
+            : null;
+        if (!d || !d.currentPosition || !d.targetPosition) {
+            container.innerHTML = '<div class="sidebar-section"><div class="sidebar-position-desc">⚠️ 诊断摘要数据缺失，请检查数据源后刷新</div></div>';
+            return;
+        }
+
+        const sanitizer = window.dataSanitizer;
+        const currentScore = sanitizer ? sanitizer.clampScore(d.currentPosition.score, 0) : 0;
+        const targetScore = sanitizer ? sanitizer.clampScore(d.targetPosition.score, 0) : 0;
+        const keyGaps = Array.isArray(d.keyGaps) ? d.keyGaps : [];
         let html = '';
 
         html += '<div class="sidebar-section">';
@@ -247,7 +322,7 @@ class ComponentRenderer {
                     <div class="sidebar-position-subtitle">${d.currentPosition.subtitle}</div>
                 </div>
                 <div class="sidebar-score-bar">
-                    <div class="sidebar-score-fill is-red" style="width: ${d.currentPosition.score}%"></div>
+                    <div class="sidebar-score-fill is-red" style="width: ${currentScore}%"></div>
                 </div>
                 <div class="sidebar-position-desc">${d.currentPosition.description}</div>
             </div>
@@ -263,7 +338,7 @@ class ComponentRenderer {
                     <div class="sidebar-position-subtitle">${d.targetPosition.subtitle}</div>
                 </div>
                 <div class="sidebar-score-bar">
-                    <div class="sidebar-score-fill is-green" style="width: ${d.targetPosition.score}%"></div>
+                    <div class="sidebar-score-fill is-green" style="width: ${targetScore}%"></div>
                 </div>
                 <div class="sidebar-gap-badge">⚠️ ${d.targetPosition.gap}</div>
             </div>
@@ -272,23 +347,27 @@ class ComponentRenderer {
 
         html += '<div class="sidebar-section">';
         html += '<div class="sidebar-section-title">🔴 关键断层</div>';
-        d.keyGaps.forEach(gap => {
-            const sevClass = gap.severity === 'critical' ? 'is-critical' : 'is-high';
-            html += `
-                <div class="sidebar-gap-card ${sevClass}" data-gap-id="${gap.id}">
-                    <div class="sidebar-gap-header">
-                        <span class="sidebar-gap-icon">${gap.icon}</span>
-                        <span class="sidebar-gap-title">${gap.title}</span>
-                        <span class="sidebar-gap-severity ${sevClass}">${gap.severity === 'critical' ? '严重' : '高'}</span>
+        if (keyGaps.length) {
+            keyGaps.forEach(gap => {
+                const sevClass = gap.severity === 'critical' ? 'is-critical' : 'is-high';
+                html += `
+                    <div class="sidebar-gap-card ${sevClass}" data-gap-id="${gap.id}">
+                        <div class="sidebar-gap-header">
+                            <span class="sidebar-gap-icon">${gap.icon}</span>
+                            <span class="sidebar-gap-title">${gap.title}</span>
+                            <span class="sidebar-gap-severity ${sevClass}">${gap.severity === 'critical' ? '严重' : '高'}</span>
+                        </div>
+                        <div class="sidebar-gap-metric">
+                            <span class="sidebar-gap-metric-value">${gap.metric}</span>
+                            <span class="sidebar-gap-metric-label">${gap.metricLabel}</span>
+                        </div>
+                        <div class="sidebar-gap-desc">${gap.description}</div>
                     </div>
-                    <div class="sidebar-gap-metric">
-                        <span class="sidebar-gap-metric-value">${gap.metric}</span>
-                        <span class="sidebar-gap-metric-label">${gap.metricLabel}</span>
-                    </div>
-                    <div class="sidebar-gap-desc">${gap.description}</div>
-                </div>
-            `;
-        });
+                `;
+            });
+        } else {
+            html += '<div class="sidebar-position-desc">断层数据待补充</div>';
+        }
         html += '</div>';
 
         container.innerHTML = html;
@@ -302,22 +381,41 @@ class ComponentRenderer {
         });
     }
 
-    // 初始化所有组件
+    // 初始化所有组件（单模块失败不影响其余模块）
     init() {
-        this.createParticles();
-        this.startTypewriter();
-        this.renderStats();
-        this.renderMatrix();
-        this.renderQuickWins();
-        this.initSidebar();
+        const steps = [
+            ['createParticles', () => this.createParticles()],
+            ['startTypewriter', () => this.startTypewriter()],
+            ['renderStats', () => this.renderStats()],
+            ['renderMatrix', () => this.renderMatrix()],
+            ['renderQuickWins', () => this.renderQuickWins()],
+            ['renderFooter', () => this.renderFooter()],
+            ['initSidebar', () => this.initSidebar()]
+        ];
+        steps.forEach(([name, fn]) => {
+            try {
+                fn();
+            } catch (err) {
+                console.error(`组件初始化失败: ${name}`, err);
+            }
+        });
 
-        // 显示欢迎提示
+        // 数据兜底提示 / 欢迎提示
+        const issues = window.dataSanitizer ? window.dataSanitizer.issues : [];
         setTimeout(() => {
-            window.toast.success(
-                '欢迎使用诊断驾驶舱',
-                '数据已加载完成，点击各模块查看详情',
-                5000
-            );
+            if (issues.length) {
+                window.toast.warning(
+                    '数据兜底已生效',
+                    `${issues.length} 处缺失字段已按兜底档处理，补齐数据后刷新即可恢复正常`,
+                    6000
+                );
+            } else {
+                window.toast.success(
+                    '欢迎使用诊断驾驶舱',
+                    '数据已加载完成，点击各模块查看详情',
+                    5000
+                );
+            }
         }, 1000);
     }
 }
